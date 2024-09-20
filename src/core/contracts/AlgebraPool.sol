@@ -555,6 +555,13 @@ contract AlgebraPool is PoolState, PoolImmutables, IAlgebraPool {
     emit Fee(newFee);
   }
 
+  /// @dev Returns new fee according to sender
+  function _getFee() private returns (uint16 currentFee) {
+    /// If tx.origin == whitelisted (IAlgebraFactory(factory).isFeeless(tx.origin))
+    /// currentFee = 0;
+    currentFee = globalState.fee;
+  }
+
   function _payCommunityFee(address token, uint256 amount) private {
     address vault = IAlgebraFactory(factory).vaultAddress();
     TransferHelper.safeTransfer(token, vault, amount);
@@ -733,7 +740,7 @@ contract AlgebraPool is PoolState, PoolImmutables, IAlgebraPool {
       // load from one storage slot
       currentPrice = globalState.price;
       currentTick = globalState.tick;
-      cache.fee = globalState.fee;
+      cache.fee = _getFee();
       cache.timepointIndex = globalState.timepointIndex;
       uint256 _communityFeeToken0 = globalState.communityFeeToken0;
       uint256 _communityFeeToken1 = globalState.communityFeeToken1;
@@ -784,7 +791,8 @@ contract AlgebraPool is PoolState, PoolImmutables, IAlgebraPool {
       if (newTimepointIndex != cache.timepointIndex) {
         cache.timepointIndex = newTimepointIndex;
         cache.volumePerLiquidityInBlock = 0;
-        cache.fee = _getNewFee(blockTimestamp, currentTick, newTimepointIndex, currentLiquidity);
+        globalState.fee = _getNewFee(blockTimestamp, currentTick, newTimepointIndex, currentLiquidity);
+        cache.fee = _getFee();
       }
     }
 
@@ -885,7 +893,7 @@ contract AlgebraPool is PoolState, PoolImmutables, IAlgebraPool {
       ? (cache.amountRequiredInitial - amountRequired, cache.amountCalculated) // the amount to get could be less then initially specified (e.g. reached limit)
       : (cache.amountCalculated, cache.amountRequiredInitial - amountRequired);
 
-    (globalState.price, globalState.tick, globalState.fee, globalState.timepointIndex) = (currentPrice, currentTick, cache.fee, cache.timepointIndex);
+    (globalState.price, globalState.tick, globalState.timepointIndex) = (currentPrice, currentTick, cache.timepointIndex);
 
     (liquidity, volumePerLiquidityInBlock) = (
       currentLiquidity,
